@@ -513,96 +513,101 @@
 <div id="toast"></div>
 
 <script>
-  // ── 탭 전환 (ID 기반, 안전) ──
+  // ── 탭 전환 ──
   function switchTab(name) {
-    ['run', 'keywords'].forEach(n => {
-      const panel = document.getElementById('tab-' + n);
+    ['run', 'keywords'].forEach(function(n) {
+      var panel = document.getElementById('tab-' + n);
       if (panel) panel.classList.toggle('active', n === name);
     });
-    document.querySelectorAll('#tabs-main .tab-btn').forEach((btn, i) => {
+    document.querySelectorAll('#tabs-main .tab-btn').forEach(function(btn, i) {
       btn.classList.toggle('active', ['run', 'keywords'][i] === name);
     });
   }
 
   function switchSettingsTab(name) {
-    ['wp', 'coupang', 'schedule'].forEach(n => {
-      const panel = document.getElementById('stab-' + n);
+    ['wp', 'coupang', 'schedule'].forEach(function(n) {
+      var panel = document.getElementById('stab-' + n);
       if (panel) panel.classList.toggle('active', n === name);
     });
-    document.querySelectorAll('#tabs-settings .tab-btn').forEach((btn, i) => {
+    document.querySelectorAll('#tabs-settings .tab-btn').forEach(function(btn, i) {
       btn.classList.toggle('active', ['wp', 'coupang', 'schedule'][i] === name);
+    });
+  }
+
+  // ── API 공통 처리 ──
+  function apiFetch(url, options) {
+    return fetch(url, options).then(function(r) {
+      if (r.status === 401) { location.href = '/login'; throw new Error('auth'); }
+      return r.json();
     });
   }
 
   // ── 키워드 관리 ──
   function addKeyword() {
-    const input = document.getElementById('newKeyword');
-    const val = input.value.trim();
+    var input = document.getElementById('newKeyword');
+    var val = input.value.trim();
     if (!val) return;
-    const list = document.getElementById('kwTagList');
-    const tag = document.createElement('span');
+    var list = document.getElementById('kwTagList');
+    var tag = document.createElement('span');
     tag.className = 'tag';
     tag.dataset.kw = val;
-    tag.innerHTML = val + ' <span class="remove" onclick="this.closest(\'.tag\').remove()">✕</span>';
+    tag.innerHTML = val + ' <span class="remove" onclick="this.closest(\'.tag\').remove()">&#x2715;</span>';
     list.appendChild(tag);
     input.value = '';
     input.focus();
   }
 
-  function removeKeyword(el) {
-    el.closest('.tag').remove();
-  }
-
   function getKeywords() {
-    return [...document.querySelectorAll('#kwTagList .tag')].map(t => t.dataset.kw);
+    return Array.from(document.querySelectorAll('#kwTagList .tag')).map(function(t) { return t.dataset.kw; });
   }
 
   function saveKeywords() {
-    const kws = getKeywords();
-    fetch('/api/settings', {
+    var kws = getKeywords();
+    apiFetch('/api/settings', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ KEYWORDS: kws.join(',') })
     })
-    .then(r => r.json())
-    .then(d => showToast('키워드 저장 완료!', 'success'))
-    .catch(() => showToast('저장 실패', 'error'));
+    .then(function() { showToast('키워드 저장 완료!', 'success'); })
+    .catch(function(e) { if (e.message !== 'auth') showToast('저장 실패', 'error'); });
   }
 
-  // ── 실행 ──
+  // ── 업로드 실행 ──
   function startUpload() {
-    const limit = parseInt(document.getElementById('runLimit').value);
-    const allKws = getKeywords();
+    var limitEl = document.getElementById('runLimit');
+    var limit = limitEl ? parseInt(limitEl.value) : 5;
+    var kws = getKeywords();
 
-    if (allKws.length === 0) {
-      showToast('키워드 관리 탭에서 키워드를 추가하세요!', 'error');
+    if (kws.length === 0) {
+      showToast('키워드 관리 탭에서 키워드를 먼저 추가하세요!', 'error');
       return;
     }
 
-    fetch('/api/start', {
+    setRunning(true);
+    apiFetch('/api/start', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ keywords: allKws, limit: limit })
+      body: JSON.stringify({ keywords: kws, limit: limit })
     })
-    .then(r => r.json())
-    .then(d => {
+    .then(function(d) {
       showToast(d.message, d.status === 'ok' ? 'success' : 'error');
-      if (d.status === 'ok') setRunning(true);
+      if (d.status !== 'ok') setRunning(false);
     })
-    .catch(() => showToast('서버 연결 실패', 'error'));
+    .catch(function(e) {
+      if (e.message !== 'auth') { showToast('서버 연결 실패', 'error'); setRunning(false); }
+    });
   }
 
   function stopUpload() {
-    fetch('/api/stop', { method: 'POST' })
-    .then(r => r.json())
-    .then(d => { showToast(d.message, 'info'); setRunning(false); })
-    .catch(() => showToast('중지 요청 실패', 'error'));
+    apiFetch('/api/stop', { method: 'POST' })
+    .then(function(d) { showToast(d.message, 'info'); setRunning(false); })
+    .catch(function(e) { if (e.message !== 'auth') showToast('중지 실패', 'error'); });
   }
 
   function setRunning(running) {
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn  = document.getElementById('stopBtn');
-    const badge    = document.getElementById('runningBadge');
+    var startBtn = document.getElementById('startBtn');
+    var stopBtn  = document.getElementById('stopBtn');
+    var badge    = document.getElementById('runningBadge');
     if (startBtn) startBtn.disabled = running;
     if (stopBtn)  stopBtn.style.display = running ? 'inline-flex' : 'none';
     if (badge)    badge.classList.toggle('active', running);
@@ -610,50 +615,48 @@
 
   // ── 설정 저장 ──
   function saveSettings() {
-    const keys = [
+    var keys = [
       'WP_URL','WP_USERNAME','WP_APP_PASSWORD','POST_STATUS','POST_CATEGORY_ID',
       'COUPANG_ACCESS_KEY','COUPANG_SECRET_KEY','COUPANG_AFFILIATE_ID',
       'SCHEDULE_INTERVAL_HOURS','POSTS_PER_RUN'
     ];
-    const data = {};
-    keys.forEach(k => {
-      const el = document.getElementById('s_' + k);
-      if (el && el.value.trim()) data[k] = el.value.trim();
+    var data = {};
+    keys.forEach(function(k) {
+      var el = document.getElementById('s_' + k);
+      if (el && el.value !== undefined) {
+        var v = el.value;
+        if (v !== '') data[k] = v;
+      }
     });
 
-    if (Object.keys(data).length === 0) {
-      showToast('변경된 항목이 없습니다', 'info');
-      return;
-    }
-
-    fetch('/api/settings', {
+    apiFetch('/api/settings', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(data)
     })
-    .then(r => r.json())
-    .then(d => showToast(d.message, 'success'))
-    .catch(() => showToast('저장 실패', 'error'));
+    .then(function(d) {
+      showToast(d.status === 'ok' ? '설정이 저장되었습니다!' : (d.message || '오류'), d.status === 'ok' ? 'success' : 'error');
+    })
+    .catch(function(e) { if (e.message !== 'auth') showToast('저장 실패 — 서버를 확인하세요', 'error'); });
   }
 
   // ── 로그 폴링 ──
-  let logOffset = {{ logs|length }};
+  var logOffset = {{ logs|length }};
 
   function pollLogs() {
-    fetch('/api/logs?offset=' + logOffset)
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(d => {
-      const container = document.getElementById('logContainer');
-      const empty = container.querySelector('.log-empty');
+    apiFetch('/api/logs?offset=' + logOffset)
+    .then(function(d) {
+      var container = document.getElementById('logContainer');
+      var empty = container.querySelector('.log-empty');
       if (empty && d.logs.length > 0) empty.remove();
 
-      d.logs.forEach(log => {
-        const line = document.createElement('div');
+      d.logs.forEach(function(log) {
+        var line = document.createElement('div');
         line.className = 'log-line';
-        const time = document.createElement('span');
+        var time = document.createElement('span');
         time.className = 'log-time';
         time.textContent = log.time;
-        const msg = document.createElement('span');
+        var msg = document.createElement('span');
         msg.className = 'log-msg ' + log.level;
         msg.textContent = log.message;
         line.appendChild(time);
@@ -664,33 +667,42 @@
       if (d.logs.length > 0) {
         logOffset = d.total;
         container.scrollTop = container.scrollHeight;
-        document.getElementById('logCount').textContent = d.total + '개';
+        var lc = document.getElementById('logCount');
+        if (lc) lc.textContent = d.total + '개';
       }
-      setRunning(d.is_running);
+
+      // is_running 상태가 서버와 다를 때만 업데이트
+      var startBtn = document.getElementById('startBtn');
+      if (startBtn && startBtn.disabled !== d.is_running) {
+        setRunning(d.is_running);
+      }
     })
-    .catch(() => {}); // 세션 만료 시 조용히 무시
+    .catch(function() {}); // auth 에러는 apiFetch에서 처리
   }
 
   function clearLogs() {
-    fetch('/api/clear-logs', { method: 'POST' })
-    .then(() => {
+    apiFetch('/api/clear-logs', { method: 'POST' })
+    .then(function() {
       document.getElementById('logContainer').innerHTML = '<div class="log-empty">아직 로그가 없습니다</div>';
       logOffset = 0;
-      document.getElementById('logCount').textContent = '0개';
+      var lc = document.getElementById('logCount');
+      if (lc) lc.textContent = '0개';
       showToast('로그 지움', 'info');
-    });
+    })
+    .catch(function(e) { if (e.message !== 'auth') showToast('실패', 'error'); });
   }
 
-  setInterval(pollLogs, 2000);
+  setInterval(pollLogs, 3000);
 
   // ── 토스트 ──
-  let toastTimer;
+  var toastTimer;
   function showToast(msg, type) {
-    const t = document.getElementById('toast');
+    var t = document.getElementById('toast');
+    if (!t) return;
     t.textContent = msg;
     t.className = 'show ' + (type || 'info');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+    toastTimer = setTimeout(function() { t.className = ''; }, 4000);
   }
 </script>
 </body>
