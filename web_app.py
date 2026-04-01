@@ -1,8 +1,11 @@
 """
 쿠팡 파트너스 × 워드프레스 웹 대시보드
 """
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from functools import wraps
 import threading
+import hashlib
+import secrets
 import json
 import os
 import time
@@ -12,7 +15,31 @@ from dotenv import load_dotenv, set_key
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+
+
+# ── 인증 ──
+def get_password_hash():
+    pw = os.getenv("DASHBOARD_PASSWORD", "")
+    if not pw:
+        return None
+    return hashlib.sha256(pw.encode()).hexdigest()
+
+def check_password(password: str) -> bool:
+    stored = get_password_hash()
+    if not stored:
+        return True  # 비밀번호 미설정 시 로컬에서만 접근 가능하도록 허용
+    return hashlib.sha256(password.encode()).hexdigest() == stored
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            if request.is_json:
+                return jsonify({"status": "error", "message": "인증 필요"}), 401
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
 
 # 업로드 로그 (메모리)
 upload_logs = []
@@ -70,7 +97,27 @@ def run_upload_task(keywords, limit):
         is_running = False
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        pw = request.form.get("password", "")
+        if check_password(pw):
+            session["logged_in"] = True
+            session.permanent = True
+            return redirect(url_for("index"))
+        error = "비밀번호가 틀렸습니다."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index():
     env = {
         "WP_URL": os.getenv("WP_URL", ""),
@@ -88,6 +135,7 @@ def index():
 
 
 @app.route("/api/start", methods=["POST"])
+@login_required
 def api_start():
     global is_running, run_thread
     if is_running:
@@ -103,6 +151,7 @@ def api_start():
 
 
 @app.route("/api/stop", methods=["POST"])
+@login_required
 def api_stop():
     global is_running
     is_running = False
@@ -111,6 +160,7 @@ def api_stop():
 
 
 @app.route("/api/logs")
+@login_required
 def api_logs():
     offset = int(request.args.get("offset", 0))
     return jsonify({
@@ -121,12 +171,14 @@ def api_logs():
 
 
 @app.route("/api/clear-logs", methods=["POST"])
+@login_required
 def api_clear_logs():
     upload_logs.clear()
     return jsonify({"status": "ok"})
 
 
 @app.route("/api/settings", methods=["POST"])
+@login_required
 def api_settings():
     data = request.json or {}
     env_path = os.path.join(os.path.dirname(__file__), ".env")
@@ -149,6 +201,7 @@ def api_settings():
 
 
 @app.route("/api/status")
+@login_required
 def api_status():
     return jsonify({
         "is_running": is_running,
