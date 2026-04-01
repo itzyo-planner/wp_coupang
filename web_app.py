@@ -127,6 +127,7 @@ def index():
         "POSTS_PER_RUN": os.getenv("POSTS_PER_RUN", "5"),
         "SCHEDULE_INTERVAL_HOURS": os.getenv("SCHEDULE_INTERVAL_HOURS", "6"),
         "POST_STATUS": os.getenv("POST_STATUS", "publish"),
+        "POST_CATEGORY_ID": os.getenv("POST_CATEGORY_ID", "1"),
     }
     keywords_raw = os.getenv("KEYWORDS", "노트북,무선이어폰,공기청정기,전기밥솥,스마트워치")
     keywords = [k.strip() for k in keywords_raw.split(",") if k.strip()]

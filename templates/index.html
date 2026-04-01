@@ -351,7 +351,7 @@
       <div class="card" style="margin-bottom:20px;">
         <div class="card-title">🚀 업로드 실행</div>
 
-        <div class="tabs">
+        <div class="tabs" id="tabs-main">
           <button class="tab-btn active" onclick="switchTab('run')">실행</button>
           <button class="tab-btn" onclick="switchTab('keywords')">키워드 관리</button>
         </div>
@@ -432,7 +432,7 @@
   <!-- 설정 섹션 -->
   <div class="card" style="margin-top:20px;">
     <div class="card-title">⚙️ 설정</div>
-    <div class="tabs">
+    <div class="tabs" id="tabs-settings">
       <button class="tab-btn active" onclick="switchSettingsTab('wp')">워드프레스</button>
       <button class="tab-btn" onclick="switchSettingsTab('coupang')">쿠팡 API</button>
       <button class="tab-btn" onclick="switchSettingsTab('schedule')">스케줄</button>
@@ -462,7 +462,7 @@
         </div>
         <div class="form-group">
           <label>카테고리 ID</label>
-          <input type="number" id="s_POST_CATEGORY_ID" value="{{ env.get('POST_CATEGORY_ID', '1') }}" placeholder="1"/>
+          <input type="number" id="s_POST_CATEGORY_ID" value="{{ env.POST_CATEGORY_ID }}" placeholder="1"/>
         </div>
       </div>
     </div>
@@ -513,23 +513,25 @@
 <div id="toast"></div>
 
 <script>
-  // ── 탭 전환 ──
+  // ── 탭 전환 (ID 기반, 안전) ──
   function switchTab(name) {
-    document.querySelectorAll('#tab-run, #tab-keywords').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tabs')[0].querySelectorAll('.tab-btn').forEach((btn, i) => {
-      btn.classList.toggle('active', ['run','keywords'][i] === name);
+    ['run', 'keywords'].forEach(n => {
+      const panel = document.getElementById('tab-' + n);
+      if (panel) panel.classList.toggle('active', n === name);
     });
-    document.getElementById('tab-' + name).classList.add('active');
+    document.querySelectorAll('#tabs-main .tab-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', ['run', 'keywords'][i] === name);
+    });
   }
 
   function switchSettingsTab(name) {
-    ['wp','coupang','schedule'].forEach(n => {
-      document.getElementById('stab-' + n).classList.remove('active');
+    ['wp', 'coupang', 'schedule'].forEach(n => {
+      const panel = document.getElementById('stab-' + n);
+      if (panel) panel.classList.toggle('active', n === name);
     });
-    document.querySelectorAll('.tabs')[1].querySelectorAll('.tab-btn').forEach((btn, i) => {
-      btn.classList.toggle('active', ['wp','coupang','schedule'][i] === name);
+    document.querySelectorAll('#tabs-settings .tab-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', ['wp', 'coupang', 'schedule'][i] === name);
     });
-    document.getElementById('stab-' + name).classList.add('active');
   }
 
   // ── 키워드 관리 ──
@@ -541,9 +543,10 @@
     const tag = document.createElement('span');
     tag.className = 'tag';
     tag.dataset.kw = val;
-    tag.innerHTML = `${val} <span class="remove" onclick="removeKeyword(this)">✕</span>`;
+    tag.innerHTML = val + ' <span class="remove" onclick="this.closest(\'.tag\').remove()">✕</span>';
     list.appendChild(tag);
     input.value = '';
+    input.focus();
   }
 
   function removeKeyword(el) {
@@ -562,61 +565,66 @@
       body: JSON.stringify({ KEYWORDS: kws.join(',') })
     })
     .then(r => r.json())
-    .then(d => showToast('키워드 저장 완료!', 'success'));
+    .then(d => showToast('키워드 저장 완료!', 'success'))
+    .catch(() => showToast('저장 실패', 'error'));
   }
 
   // ── 실행 ──
   function startUpload() {
     const limit = parseInt(document.getElementById('runLimit').value);
-    const runTags = [...document.querySelectorAll('#runTagList .tag')].map(t => t.dataset.kw);
     const allKws = getKeywords();
-    const keywords = runTags.length > 0 ? runTags : allKws;
 
-    if (keywords.length === 0) {
-      showToast('키워드를 먼저 추가하세요!', 'error');
+    if (allKws.length === 0) {
+      showToast('키워드 관리 탭에서 키워드를 추가하세요!', 'error');
       return;
     }
 
     fetch('/api/start', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ keywords, limit })
+      body: JSON.stringify({ keywords: allKws, limit: limit })
     })
     .then(r => r.json())
     .then(d => {
-      if (d.status === 'ok') {
-        showToast(d.message, 'success');
-        setRunning(true);
-      } else {
-        showToast(d.message, 'error');
-      }
-    });
+      showToast(d.message, d.status === 'ok' ? 'success' : 'error');
+      if (d.status === 'ok') setRunning(true);
+    })
+    .catch(() => showToast('서버 연결 실패', 'error'));
   }
 
   function stopUpload() {
     fetch('/api/stop', { method: 'POST' })
     .then(r => r.json())
-    .then(d => {
-      showToast(d.message, 'info');
-      setRunning(false);
-    });
+    .then(d => { showToast(d.message, 'info'); setRunning(false); })
+    .catch(() => showToast('중지 요청 실패', 'error'));
   }
 
   function setRunning(running) {
-    document.getElementById('startBtn').disabled = running;
-    document.getElementById('stopBtn').style.display = running ? 'inline-flex' : 'none';
-    document.getElementById('runningBadge').classList.toggle('active', running);
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn  = document.getElementById('stopBtn');
+    const badge    = document.getElementById('runningBadge');
+    if (startBtn) startBtn.disabled = running;
+    if (stopBtn)  stopBtn.style.display = running ? 'inline-flex' : 'none';
+    if (badge)    badge.classList.toggle('active', running);
   }
 
   // ── 설정 저장 ──
   function saveSettings() {
+    const keys = [
+      'WP_URL','WP_USERNAME','WP_APP_PASSWORD','POST_STATUS','POST_CATEGORY_ID',
+      'COUPANG_ACCESS_KEY','COUPANG_SECRET_KEY','COUPANG_AFFILIATE_ID',
+      'SCHEDULE_INTERVAL_HOURS','POSTS_PER_RUN'
+    ];
     const data = {};
-    ['WP_URL','WP_USERNAME','WP_APP_PASSWORD','POST_STATUS','POST_CATEGORY_ID',
-     'COUPANG_ACCESS_KEY','COUPANG_SECRET_KEY','COUPANG_AFFILIATE_ID',
-     'SCHEDULE_INTERVAL_HOURS','POSTS_PER_RUN'].forEach(k => {
+    keys.forEach(k => {
       const el = document.getElementById('s_' + k);
-      if (el && el.value) data[k] = el.value;
+      if (el && el.value.trim()) data[k] = el.value.trim();
     });
+
+    if (Object.keys(data).length === 0) {
+      showToast('변경된 항목이 없습니다', 'info');
+      return;
+    }
 
     fetch('/api/settings', {
       method: 'POST',
@@ -624,7 +632,8 @@
       body: JSON.stringify(data)
     })
     .then(r => r.json())
-    .then(d => showToast(d.message, 'success'));
+    .then(d => showToast(d.message, 'success'))
+    .catch(() => showToast('저장 실패', 'error'));
   }
 
   // ── 로그 폴링 ──
@@ -632,16 +641,23 @@
 
   function pollLogs() {
     fetch('/api/logs?offset=' + logOffset)
-    .then(r => r.json())
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(d => {
       const container = document.getElementById('logContainer');
       const empty = container.querySelector('.log-empty');
-      if (empty) empty.remove();
+      if (empty && d.logs.length > 0) empty.remove();
 
       d.logs.forEach(log => {
         const line = document.createElement('div');
         line.className = 'log-line';
-        line.innerHTML = `<span class="log-time">${log.time}</span><span class="log-msg ${log.level}">${log.message}</span>`;
+        const time = document.createElement('span');
+        time.className = 'log-time';
+        time.textContent = log.time;
+        const msg = document.createElement('span');
+        msg.className = 'log-msg ' + log.level;
+        msg.textContent = log.message;
+        line.appendChild(time);
+        line.appendChild(msg);
         container.appendChild(line);
       });
 
@@ -650,9 +666,9 @@
         container.scrollTop = container.scrollHeight;
         document.getElementById('logCount').textContent = d.total + '개';
       }
-
       setRunning(d.is_running);
-    });
+    })
+    .catch(() => {}); // 세션 만료 시 조용히 무시
   }
 
   function clearLogs() {
@@ -669,21 +685,13 @@
 
   // ── 토스트 ──
   let toastTimer;
-  function showToast(msg, type = 'info') {
+  function showToast(msg, type) {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.className = 'show ' + type;
+    t.className = 'show ' + (type || 'info');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.className = ''; }, 3000);
   }
-
-  // ── 런 탭 키워드 추가 ──
-  (function initRunTags() {
-    const list = document.getElementById('runTagList');
-    list.addEventListener('click', e => {
-      if (e.target.classList.contains('remove')) e.target.closest('.tag').remove();
-    });
-  })();
 </script>
 </body>
 </html>
