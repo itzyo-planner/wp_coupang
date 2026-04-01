@@ -10,9 +10,35 @@ import json
 import os
 import time
 from datetime import datetime
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 
 load_dotenv()
+
+# ── 설정 파일 (로컬: .env / 클라우드: config.json) ──
+CONFIG_FILE = os.path.join(os.path.dirname(__file__), "config.json")
+
+def load_config():
+    """config.json 로드 (없으면 빈 dict)"""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+def save_config(data: dict):
+    """config.json 저장 + 환경변수 동기화"""
+    cfg = load_config()
+    cfg.update(data)
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    for k, v in data.items():
+        os.environ[k] = str(v)
+
+def get_cfg(key: str, default: str = "") -> str:
+    """환경변수 → config.json 순으로 읽기"""
+    return os.getenv(key) or load_config().get(key, default)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
@@ -120,16 +146,16 @@ def logout():
 @login_required
 def index():
     env = {
-        "WP_URL": os.getenv("WP_URL", ""),
-        "WP_USERNAME": os.getenv("WP_USERNAME", ""),
-        "COUPANG_ACCESS_KEY": os.getenv("COUPANG_ACCESS_KEY", ""),
-        "COUPANG_AFFILIATE_ID": os.getenv("COUPANG_AFFILIATE_ID", ""),
-        "POSTS_PER_RUN": os.getenv("POSTS_PER_RUN", "5"),
-        "SCHEDULE_INTERVAL_HOURS": os.getenv("SCHEDULE_INTERVAL_HOURS", "6"),
-        "POST_STATUS": os.getenv("POST_STATUS", "publish"),
-        "POST_CATEGORY_ID": os.getenv("POST_CATEGORY_ID", "1"),
+        "WP_URL": get_cfg("WP_URL"),
+        "WP_USERNAME": get_cfg("WP_USERNAME"),
+        "COUPANG_ACCESS_KEY": get_cfg("COUPANG_ACCESS_KEY"),
+        "COUPANG_AFFILIATE_ID": get_cfg("COUPANG_AFFILIATE_ID"),
+        "POSTS_PER_RUN": get_cfg("POSTS_PER_RUN", "5"),
+        "SCHEDULE_INTERVAL_HOURS": get_cfg("SCHEDULE_INTERVAL_HOURS", "6"),
+        "POST_STATUS": get_cfg("POST_STATUS", "publish"),
+        "POST_CATEGORY_ID": get_cfg("POST_CATEGORY_ID", "1"),
     }
-    keywords_raw = os.getenv("KEYWORDS", "노트북,무선이어폰,공기청정기,전기밥솥,스마트워치")
+    keywords_raw = get_cfg("KEYWORDS", "노트북,무선이어폰,공기청정기,전기밥솥,스마트워치")
     keywords = [k.strip() for k in keywords_raw.split(",") if k.strip()]
     return render_template("index.html", env=env, keywords=keywords,
                            is_running=is_running, logs=upload_logs[-50:])
@@ -182,22 +208,15 @@ def api_clear_logs():
 @login_required
 def api_settings():
     data = request.json or {}
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-
-    if not os.path.exists(env_path):
-        open(env_path, "w").close()
-
-    fields = [
+    allowed = [
         "WP_URL", "WP_USERNAME", "WP_APP_PASSWORD",
         "COUPANG_ACCESS_KEY", "COUPANG_SECRET_KEY", "COUPANG_AFFILIATE_ID",
         "POSTS_PER_RUN", "SCHEDULE_INTERVAL_HOURS", "POST_STATUS",
         "POST_CATEGORY_ID", "KEYWORDS"
     ]
-    for field in fields:
-        if field in data and data[field]:
-            set_key(env_path, field, str(data[field]))
-            os.environ[field] = str(data[field])
-
+    to_save = {k: v for k, v in data.items() if k in allowed and v}
+    if to_save:
+        save_config(to_save)
     return jsonify({"status": "ok", "message": "설정 저장 완료!"})
 
 
@@ -212,4 +231,6 @@ def api_status():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000, host="0.0.0.0")
+    port = int(os.getenv("PORT", 5000))
+    debug = os.getenv("FLASK_ENV") == "development"
+    app.run(debug=debug, port=port, host="0.0.0.0")
