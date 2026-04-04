@@ -272,6 +272,15 @@
         </div>
 
         <div class="form-group">
+          <label>카테고리
+            <button onclick="fetchCategories()" style="margin-left:8px; background:none; border:1px solid var(--border); color:var(--muted); padding:2px 8px; border-radius:6px; font-size:0.75rem; cursor:pointer;">불러오기</button>
+          </label>
+          <select id="wp_category">
+            <option value="">-- 카테고리 선택 (불러오기 클릭) --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
           <label>포스트 상태</label>
           <select id="wp_status">
             <option value="draft" {% if env.POST_STATUS == 'draft' %}selected{% endif %}>draft (임시저장)</option>
@@ -374,6 +383,7 @@
     document.getElementById('wp_user').value = acc.user;
     document.getElementById('wp_pw').value = acc.pw;
     document.getElementById('wp_account_name').value = acc.name;
+    document.getElementById('wp_category').innerHTML = '<option value="">-- 카테고리 선택 (불러오기 클릭) --</option>';
   }
 
   function saveWpAccount() {
@@ -390,6 +400,30 @@
       showToast(d.message, d.status === 'ok' ? 'success' : 'error');
       if (d.status === 'ok') loadWpAccounts();
     }).catch(function(e) { if (e.message !== 'auth') showToast('저장 실패', 'error'); });
+  }
+
+  function fetchCategories() {
+    var url  = document.getElementById('wp_url').value.trim();
+    var user = document.getElementById('wp_user').value.trim();
+    var pw   = document.getElementById('wp_pw').value.trim();
+    if (!url || !user || !pw) { showToast('WP URL/아이디/비밀번호 먼저 입력하세요', 'error'); return; }
+    showToast('카테고리 불러오는 중...', 'info');
+    apiFetch('/api/wp-categories', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({wp_url: url, wp_user: user, wp_pw: pw})
+    }).then(function(d) {
+      if (d.status !== 'ok') { showToast(d.message, 'error'); return; }
+      var sel = document.getElementById('wp_category');
+      sel.innerHTML = '<option value="">-- 미분류 --</option>';
+      d.categories.forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+      showToast('카테고리 ' + d.categories.length + '개 로드됨', 'success');
+    }).catch(function(e) { if (e.message !== 'auth') showToast('불러오기 실패', 'error'); });
   }
 
   function deleteWpAccount() {
@@ -471,6 +505,7 @@
       wp_user: document.getElementById('wp_user').value.trim(),
       wp_pw: document.getElementById('wp_pw').value.trim(),
       wp_status: document.getElementById('wp_status').value,
+      category_id: document.getElementById('wp_category').value || null,
       use_unsplash: document.getElementById('use_unsplash').checked,
       max_images: parseInt(document.getElementById('max_images').value),
       h2_only: document.getElementById('h2_only').checked,

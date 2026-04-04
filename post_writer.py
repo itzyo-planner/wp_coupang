@@ -66,11 +66,14 @@ def wp_upload_media(wp_base_url: str, auth_headers: dict, image_bytes: bytes, fi
 
 
 def wp_create_post(wp_base_url: str, auth_headers: dict, title: str, html_content: str,
-                   status: str = "draft", featured_media_id: Optional[int] = None) -> dict:
+                   status: str = "draft", featured_media_id: Optional[int] = None,
+                   category_id: Optional[int] = None) -> dict:
     posts_url = wp_base_url.rstrip("/") + "/wp-json/wp/v2/posts"
     payload = {"title": title, "content": html_content, "status": status}
     if featured_media_id:
         payload["featured_media"] = featured_media_id
+    if category_id:
+        payload["categories"] = [category_id]
     r = requests.post(posts_url, headers={**auth_headers, "Content-Type": "application/json"},
                       json=payload, timeout=90)
     r.raise_for_status()
@@ -349,6 +352,7 @@ def run_post_pipeline(
     max_images: int = 3,
     h2_only: bool = False,
     platform: str = "general",
+    category_id: Optional[int] = None,
     log: Callable = None,
 ) -> dict:
     """
@@ -418,7 +422,7 @@ def run_post_pipeline(
     # 6) WordPress 업로드
     _log("워드프레스에 업로드 중...")
     result = wp_create_post(wp_url, auth, title, html_content, status=wp_status,
-                            featured_media_id=featured_media_id)
+                            featured_media_id=featured_media_id, category_id=category_id)
     post_url = result.get("link", "")
     _log(f"업로드 완료: {post_url}")
 

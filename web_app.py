@@ -284,6 +284,7 @@ def api_writer_start():
                 max_images      = int(data.get("max_images", 3)),
                 h2_only         = data.get("h2_only", False),
                 platform        = data.get("platform", "general"),
+                category_id     = int(data["category_id"]) if data.get("category_id") else None,
                 log             = lambda msg: add_log(msg, "info"),
             )
             add_log(f"완료! 포스트: {result.get('post_url')}", "success")
@@ -294,6 +295,31 @@ def api_writer_start():
 
     threading.Thread(target=task, daemon=True).start()
     return jsonify({"status": "ok", "message": "글 작성 시작!"})
+
+
+@app.route("/api/wp-categories", methods=["POST"])
+@login_required
+def api_wp_categories():
+    import base64
+    data = request.json or {}
+    wp_url  = data.get("wp_url", "").rstrip("/")
+    wp_user = data.get("wp_user", "")
+    wp_pw   = data.get("wp_pw", "").replace(" ", "")
+    if not wp_url or not wp_user or not wp_pw:
+        return jsonify({"status": "error", "message": "WP 정보 필요"})
+    token = base64.b64encode(f"{wp_user}:{wp_pw}".encode()).decode()
+    try:
+        r = requests.get(
+            f"{wp_url}/wp-json/wp/v2/categories",
+            headers={"Authorization": f"Basic {token}"},
+            params={"per_page": 100},
+            timeout=15
+        )
+        r.raise_for_status()
+        cats = [{"id": c["id"], "name": c["name"]} for c in r.json()]
+        return jsonify({"status": "ok", "categories": cats})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 
 @app.route("/api/wp-accounts", methods=["GET"])
