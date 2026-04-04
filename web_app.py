@@ -296,6 +296,48 @@ def api_writer_start():
     return jsonify({"status": "ok", "message": "글 작성 시작!"})
 
 
+@app.route("/api/wp-accounts", methods=["GET"])
+@login_required
+def api_wp_accounts_list():
+    accounts = load_config().get("wp_accounts", [])
+    return jsonify({"accounts": accounts})
+
+
+@app.route("/api/wp-accounts/save", methods=["POST"])
+@login_required
+def api_wp_accounts_save():
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    url  = data.get("url", "").strip()
+    user = data.get("user", "").strip()
+    pw   = data.get("pw", "").strip()
+    if not name or not url or not user or not pw:
+        return jsonify({"status": "error", "message": "이름/URL/아이디/비밀번호 모두 입력 필요"})
+    cfg = load_config()
+    accounts = cfg.get("wp_accounts", [])
+    # 같은 이름 있으면 덮어쓰기
+    accounts = [a for a in accounts if a.get("name") != name]
+    accounts.append({"name": name, "url": url, "user": user, "pw": pw})
+    cfg["wp_accounts"] = accounts
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    return jsonify({"status": "ok", "message": f"'{name}' 저장 완료!"})
+
+
+@app.route("/api/wp-accounts/delete", methods=["POST"])
+@login_required
+def api_wp_accounts_delete():
+    name = (request.json or {}).get("name", "").strip()
+    if not name:
+        return jsonify({"status": "error", "message": "이름 필요"})
+    cfg = load_config()
+    accounts = [a for a in cfg.get("wp_accounts", []) if a.get("name") != name]
+    cfg["wp_accounts"] = accounts
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    return jsonify({"status": "ok", "message": f"'{name}' 삭제 완료!"})
+
+
 @app.route("/api/writer/save-keys", methods=["POST"])
 @login_required
 def api_writer_save_keys():
