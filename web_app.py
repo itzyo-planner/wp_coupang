@@ -230,6 +230,86 @@ def api_status():
     })
 
 
+# ── 일반글 작성 ──
+writer_running = False
+
+@app.route("/writer")
+@login_required
+def writer():
+    env = {
+        "WP_URL": get_cfg("WP_URL"),
+        "WP_USERNAME": get_cfg("WP_USERNAME"),
+        "POST_STATUS": get_cfg("POST_STATUS", "draft"),
+        "OPENAI_API_KEY": get_cfg("OPENAI_API_KEY"),
+        "GEMINI_API_KEY": get_cfg("GEMINI_API_KEY"),
+    }
+    return render_template("writer.html", env=env, logs=upload_logs[-50:])
+
+
+@app.route("/api/writer/start", methods=["POST"])
+@login_required
+def api_writer_start():
+    global writer_running
+    if writer_running:
+        return jsonify({"status": "error", "message": "이미 실행 중입니다."})
+
+    data = request.json or {}
+    required = ["system_prompt", "openai_api_key"]
+    for r in required:
+        if not data.get(r):
+            return jsonify({"status": "error", "message": f"{r} 필요"})
+
+    def task():
+        global writer_running
+        writer_running = True
+        try:
+            from post_writer import run_post_pipeline
+            wp_url   = data.get("wp_url")    or get_cfg("WP_URL")
+            wp_user  = data.get("wp_user")   or get_cfg("WP_USERNAME")
+            wp_pw    = data.get("wp_pw")     or get_cfg("WP_APP_PASSWORD")
+
+            result = run_post_pipeline(
+                source_url      = data.get("source_url", ""),
+                source_text     = data.get("source_text", ""),
+                system_prompt   = data.get("system_prompt", ""),
+                title_prompt    = data.get("title_prompt", ""),
+                openai_api_key  = data.get("openai_api_key") or get_cfg("OPENAI_API_KEY"),
+                wp_url          = wp_url,
+                wp_user         = wp_user,
+                wp_pw           = wp_pw,
+                wp_status       = data.get("wp_status", "draft"),
+                output_format   = data.get("output_format", "html"),
+                use_gemini      = data.get("use_gemini", False),
+                gemini_api_key  = data.get("gemini_api_key") or get_cfg("GEMINI_API_KEY"),
+                max_images      = int(data.get("max_images", 3)),
+                h2_only         = data.get("h2_only", False),
+                platform        = data.get("platform", "general"),
+                log             = lambda msg: add_log(msg, "info"),
+            )
+            add_log(f"완료! 포스트: {result.get('post_url')}", "success")
+        except Exception as e:
+            add_log(f"오류: {str(e)}", "error")
+        finally:
+            writer_running = False
+
+    threading.Thread(target=task, daemon=True).start()
+    return jsonify({"status": "ok", "message": "글 작성 시작!"})
+
+
+@app.route("/api/writer/save-keys", methods=["POST"])
+@login_required
+def api_writer_save_keys():
+    data = request.json or {}
+    to_save = {}
+    if data.get("OPENAI_API_KEY"):
+        to_save["OPENAI_API_KEY"] = data["OPENAI_API_KEY"]
+    if data.get("GEMINI_API_KEY"):
+        to_save["GEMINI_API_KEY"] = data["GEMINI_API_KEY"]
+    if to_save:
+        save_config(to_save)
+    return jsonify({"status": "ok", "message": "API 키 저장 완료!"})
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
     debug = os.getenv("FLASK_ENV") == "development"

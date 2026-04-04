@@ -4,3 +4,6 @@ schedule==1.2.2
 Pillow==10.4.0
 flask==3.1.0
 gunicorn==23.0.0
+openai==1.78.0
+beautifulsoup4==4.12.3
+markdown==3.7

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>일반글 작성 — 쿠팡 × 워드프레스</title>
+  <style>
+    :root {
+      --bg: #0f1117; --card: #1a1d27; --card2: #21253a;
+      --border: #2e3248; --primary: #4f6ef7; --primary-dark: #3a57e8;
+      --success: #22c55e; --warning: #f59e0b; --error: #ef4444;
+      --text: #e2e8f0; --muted: #8892aa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    header {
+      background: var(--card); border-bottom: 1px solid var(--border);
+      padding: 14px 28px; display: flex; align-items: center; gap: 12px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    header .logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #7c3aed, var(--primary));
+      border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    header h1 { font-size: 1.05rem; font-weight: 700; }
+    header p { font-size: 0.75rem; color: var(--muted); }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .nav-link {
+      color: var(--muted); font-size: 0.82rem; text-decoration: none;
+      padding: 6px 14px; border: 1px solid var(--border); border-radius: 8px;
+      transition: color 0.2s;
+    }
+    .nav-link:hover { color: var(--text); }
+    .badge-running {
+      background: rgba(34,197,94,0.15); color: var(--success);
+      border: 1px solid rgba(34,197,94,0.3); padding: 4px 12px;
+      border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+      display: none; align-items: center; gap: 6px;
+    }
+    .badge-running.active { display: flex; }
+    .dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse 1.2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media(max-width:800px) { .grid2 { grid-template-columns: 1fr; } }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+    .card-title { font-size: 0.95rem; font-weight: 700; margin-bottom: 18px; display: flex; align-items: center; gap: 8px; }
+
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 5px; font-weight: 500; }
+    input, select, textarea {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); padding: 9px 12px; border-radius: 9px;
+      font-size: 0.88rem; outline: none; transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+    textarea { resize: vertical; font-family: inherit; }
+
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+    .tab-btn {
+      padding: 8px 16px; background: none; border: none; color: var(--muted);
+      font-size: 0.85rem; cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; font-weight: 500; transition: color 0.2s;
+    }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .btn {
+      padding: 10px 20px; border-radius: 10px; font-size: 0.88rem;
+      font-weight: 600; cursor: pointer; border: none; transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+    .btn-success {
+      background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff;
+      width: 100%; justify-content: center; padding: 13px; font-size: 1rem;
+    }
+    .btn-success:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-danger {
+      background: rgba(239,68,68,0.15); color: var(--error);
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+    .btn-secondary { background: var(--card2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .toggle { position: relative; width: 44px; height: 24px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; inset: 0; background: var(--border);
+      border-radius: 12px; cursor: pointer; transition: 0.3s;
+    }
+    .slider:before {
+      content: ""; position: absolute; width: 18px; height: 18px;
+      background: #fff; border-radius: 50%; left: 3px; top: 3px; transition: 0.3s;
+    }
+    input:checked + .slider { background: var(--primary); }
+    input:checked + .slider:before { transform: translateX(20px); }
+    .toggle-label { font-size: 0.85rem; color: var(--text); }
+
+    .log-container {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; height: 380px; overflow-y: auto;
+      font-family: 'Courier New', monospace; font-size: 0.8rem; line-height: 1.7;
+    }
+    .log-container::-webkit-scrollbar { width: 5px; }
+    .log-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .log-line { display: flex; gap: 10px; padding: 1px 0; }
+    .log-time { color: var(--muted); flex-shrink: 0; font-size: 0.75rem; }
+    .log-msg.info { color: var(--text); }
+    .log-msg.success { color: var(--success); }
+    .log-msg.warning { color: var(--warning); }
+    .log-msg.error { color: var(--error); }
+    .log-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--muted); font-size: 0.85rem; }
+
+    .section-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    .text-muted { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
+    .flex-between { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; background: var(--card);
+      border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px;
+      font-size: 0.88rem; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 999;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.success { border-color: rgba(34,197,94,0.4); color: var(--success); }
+    #toast.error { border-color: rgba(239,68,68,0.4); color: var(--error); }
+    #toast.info { border-color: rgba(79,110,247,0.4); color: var(--primary); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">✍️</div>
+  <div>
+    <h1>일반글 자동 작성</h1>
+    <p>URL 또는 텍스트 → OpenAI 재작성 → 워드프레스 업로드</p>
+  </div>
+  <div class="header-right">
+    <div class="badge-running" id="runningBadge">
+      <span class="dot"></span> 작성 중
+    </div>
+    <a href="/" class="nav-link">← 대시보드</a>
+    <a href="/logout" class="nav-link" style="color:#ef4444; border-color:rgba(239,68,68,0.3);">로그아웃</a>
+  </div>
+</header>
+
+<div class="container">
+  <div class="grid2">
+
+    <!-- 왼쪽: 입력 폼 -->
+    <div>
+      <!-- API 키 -->
+      <div class="card" style="margin-bottom:18px;">
+        <div class="card-title">🔑 API 키</div>
+        <div class="form-group">
+          <label>OpenAI API Key <span style="color:var(--error)">*</span></label>
+          <input type="password" id="openai_key" value="{{ env.OPENAI_API_KEY }}" placeholder="sk-..."/>
+        </div>
+        <div class="form-group">
+          <label>Gemini API Key <span class="text-muted">(이미지 생성 선택)</span></label>
+          <input type="password" id="gemini_key" value="{{ env.GEMINI_API_KEY }}" placeholder="AIza..."/>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="saveKeys()">💾 API 키 저장</button>
+        </div>
+      </div>
+
+      <!-- 소스 -->
+      <div class="card" style="margin-bottom:18px;">
+        <div class="card-title">📄 원본 소스</div>
+        <div class="tabs" id="tabs-source">
+          <button class="tab-btn active" onclick="switchSource('url')">URL 크롤링</button>
+          <button class="tab-btn" onclick="switchSource('text')">텍스트 직접 입력</button>
+        </div>
+
+        <div class="tab-panel active" id="src-url">
+          <div class="form-group">
+            <label>원본 URL</label>
+            <input type="url" id="source_url" placeholder="https://..."/>
+          </div>
+          <div class="form-group">
+            <label>크롤링 유형</label>
+            <select id="platform">
+              <option value="general">일반 웹페이지</option>
+              <option value="naver">네이버 블로그</option>
+              <option value="tistory">티스토리</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="src-text">
+          <div class="form-group">
+            <label>원본 텍스트</label>
+            <textarea id="source_text" rows="6" placeholder="재작성할 원본 내용을 붙여넣으세요..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- 프롬프트 -->
+      <div class="card" style="margin-bottom:18px;">
+        <div class="card-title">💬 프롬프트</div>
+        <div class="form-group">
+          <label>재작성 시스템 프롬프트 <span style="color:var(--error)">*</span></label>
+          <textarea id="system_prompt" rows="5" placeholder="당신은 전문 블로거입니다. 주어진 내용을 바탕으로 독자에게 유익한 글을 작성하세요..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>제목 생성 프롬프트 <span class="text-muted">(선택 — 비우면 원본 제목 사용)</span></label>
+          <textarea id="title_prompt" rows="3" placeholder="SEO에 최적화된 블로그 제목을 생성하세요. 숫자나 연도를 포함하면 좋습니다..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 설정 + 로그 -->
+    <div>
+      <!-- 출력/WP 설정 -->
+      <div class="card" style="margin-bottom:18px;">
+        <div class="card-title">⚙️ 출력 설정</div>
+
+        <div class="form-group">
+          <label>출력 포맷</label>
+          <select id="output_format">
+            <option value="html" selected>HTML</option>
+            <option value="markdown">Markdown</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>워드프레스 URL</label>
+          <input type="url" id="wp_url" value="{{ env.WP_URL }}" placeholder="https://your-site.com"/>
+        </div>
+
+        <div class="form-group">
+          <label>워드프레스 아이디</label>
+          <input type="text" id="wp_user" value="{{ env.WP_USERNAME }}" placeholder="admin"/>
+        </div>
+
+        <div class="form-group">
+          <label>앱 비밀번호</label>
+          <input type="password" id="wp_pw" placeholder="xxxx xxxx xxxx xxxx"/>
+        </div>
+
+        <div class="form-group">
+          <label>포스트 상태</label>
+          <select id="wp_status">
+            <option value="draft" {% if env.POST_STATUS == 'draft' %}selected{% endif %}>draft (임시저장)</option>
+            <option value="publish" {% if env.POST_STATUS == 'publish' %}selected{% endif %}>publish (바로 공개)</option>
+            <option value="pending">pending (검토 대기)</option>
+          </select>
+        </div>
+
+        <hr class="section-divider"/>
+
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="use_gemini" onchange="toggleGemini()"/>
+            <span class="slider"></span>
+          </label>
+          <span class="toggle-label">Gemini 이미지 자동 생성</span>
+        </div>
+
+        <div id="gemini-opts" style="display:none;">
+          <div class="form-group">
+            <label>최대 이미지 수</label>
+            <select id="max_images">
+              <option value="1">1개</option>
+              <option value="3" selected>3개</option>
+              <option value="5">5개</option>
+            </select>
+          </div>
+          <div class="toggle-row">
+            <label class="toggle">
+              <input type="checkbox" id="h2_only"/>
+              <span class="slider"></span>
+            </label>
+            <span class="toggle-label">H2 헤딩만 (H3 제외)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 실행 버튼 -->
+      <div class="card" style="margin-bottom:18px;">
+        <button class="btn btn-success" id="startBtn" onclick="startWriter()">
+          ✍️ 글 작성 & 업로드 시작
+        </button>
+        <div class="btn-row">
+          <button class="btn btn-danger" id="stopBtn" style="display:none;" onclick="stopWriter()">
+            ⏹ 중지
+          </button>
+        </div>
+      </div>
+
+      <!-- 실시간 로그 -->
+      <div class="card">
+        <div class="flex-between">
+          <div class="card-title" style="margin-bottom:0;">📋 실시간 로그</div>
+          <button class="btn btn-secondary" style="padding:5px 11px; font-size:0.78rem;" onclick="clearLogs()">지우기</button>
+        </div>
+        <div class="log-container" id="logContainer">
+          {% if logs %}
+            {% for log in logs %}
+            <div class="log-line">
+              <span class="log-time">{{ log.time }}</span>
+              <span class="log-msg {{ log.level }}">{{ log.message }}</span>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div class="log-empty">아직 로그가 없습니다</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  var logOffset = {{ logs|length }};
+  var sourceMode = 'url';
+
+  function switchSource(name) {
+    ['url','text'].forEach(function(n) {
+      var p = document.getElementById('src-' + n);
+      if (p) p.classList.toggle('active', n === name);
+    });
+    document.querySelectorAll('#tabs-source .tab-btn').forEach(function(btn, i) {
+      btn.classList.toggle('active', ['url','text'][i] === name);
+    });
+    sourceMode = name;
+  }
+
+  function toggleGemini() {
+    var checked = document.getElementById('use_gemini').checked;
+    document.getElementById('gemini-opts').style.display = checked ? 'block' : 'none';
+  }
+
+  function apiFetch(url, opts) {
+    return fetch(url, opts).then(function(r) {
+      if (r.status === 401) { location.href = '/login'; throw new Error('auth'); }
+      return r.json();
+    });
+  }
+
+  function saveKeys() {
+    var data = {};
+    var ok = document.getElementById('openai_key').value.trim();
+    var gk = document.getElementById('gemini_key').value.trim();
+    if (ok) data.OPENAI_API_KEY = ok;
+    if (gk) data.GEMINI_API_KEY = gk;
+    apiFetch('/api/writer/save-keys', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data)
+    })
+    .then(function(d) { showToast(d.message, 'success'); })
+    .catch(function(e) { if (e.message !== 'auth') showToast('저장 실패', 'error'); });
+  }
+
+  function startWriter() {
+    var openai_key = document.getElementById('openai_key').value.trim();
+    var system_prompt = document.getElementById('system_prompt').value.trim();
+
+    if (!openai_key) { showToast('OpenAI API Key를 입력하세요!', 'error'); return; }
+    if (!system_prompt) { showToast('재작성 프롬프트를 입력하세요!', 'error'); return; }
+
+    var source_url = sourceMode === 'url' ? document.getElementById('source_url').value.trim() : '';
+    var source_text = sourceMode === 'text' ? document.getElementById('source_text').value.trim() : '';
+
+    if (!source_url && !source_text) {
+      showToast('URL 또는 텍스트를 입력하세요!', 'error'); return;
+    }
+
+    var payload = {
+      openai_api_key: openai_key,
+      gemini_api_key: document.getElementById('gemini_key').value.trim(),
+      source_url: source_url,
+      source_text: source_text,
+      platform: document.getElementById('platform').value,
+      system_prompt: system_prompt,
+      title_prompt: document.getElementById('title_prompt').value.trim(),
+      output_format: document.getElementById('output_format').value,
+      wp_url: document.getElementById('wp_url').value.trim(),
+      wp_user: document.getElementById('wp_user').value.trim(),
+      wp_pw: document.getElementById('wp_pw').value.trim(),
+      wp_status: document.getElementById('wp_status').value,
+      use_gemini: document.getElementById('use_gemini').checked,
+      max_images: parseInt(document.getElementById('max_images').value),
+      h2_only: document.getElementById('h2_only').checked,
+    };
+
+    setRunning(true);
+    apiFetch('/api/writer/start', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    })
+    .then(function(d) {
+      showToast(d.message, d.status === 'ok' ? 'success' : 'error');
+      if (d.status !== 'ok') setRunning(false);
+    })
+    .catch(function(e) {
+      if (e.message !== 'auth') { showToast('서버 오류', 'error'); setRunning(false); }
+    });
+  }
+
+  function stopWriter() {
+    apiFetch('/api/stop', { method: 'POST' })
+    .then(function() { showToast('중지 요청됨', 'info'); setRunning(false); });
+  }
+
+  function setRunning(running) {
+    var sb = document.getElementById('startBtn');
+    var st = document.getElementById('stopBtn');
+    var bd = document.getElementById('runningBadge');
+    if (sb) sb.disabled = running;
+    if (st) st.style.display = running ? 'inline-flex' : 'none';
+    if (bd) bd.classList.toggle('active', running);
+  }
+
+  function pollLogs() {
+    apiFetch('/api/logs?offset=' + logOffset)
+    .then(function(d) {
+      var c = document.getElementById('logContainer');
+      var empty = c.querySelector('.log-empty');
+      if (empty && d.logs.length > 0) empty.remove();
+      d.logs.forEach(function(log) {
+        var line = document.createElement('div');
+        line.className = 'log-line';
+        var t = document.createElement('span'); t.className = 'log-time'; t.textContent = log.time;
+        var m = document.createElement('span'); m.className = 'log-msg ' + log.level; m.textContent = log.message;
+        line.appendChild(t); line.appendChild(m); c.appendChild(line);
+      });
+      if (d.logs.length > 0) {
+        logOffset = d.total;
+        c.scrollTop = c.scrollHeight;
+      }
+      var sb = document.getElementById('startBtn');
+      if (sb && sb.disabled !== d.is_running) setRunning(d.is_running);
+    })
+    .catch(function() {});
+  }
+
+  function clearLogs() {
+    apiFetch('/api/clear-logs', { method: 'POST' })
+    .then(function() {
+      document.getElementById('logContainer').innerHTML = '<div class="log-empty">아직 로그가 없습니다</div>';
+      logOffset = 0;
+      showToast('로그 지움', 'info');
+    });
+  }
+
+  setInterval(pollLogs, 3000);
+
+  var toastTimer;
+  function showToast(msg, type) {
+    var t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.className = 'show ' + (type || 'info');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { t.className = ''; }, 4000);
+  }
+</script>
+</body>
+</html>
