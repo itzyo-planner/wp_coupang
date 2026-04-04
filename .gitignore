@@ -6,6 +6,7 @@ __pycache__/
 .DS_Store
 node_modules/
 *.log
+*.exe
 
 # wrangler files
 .wrangler
