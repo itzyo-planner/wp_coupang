@@ -241,7 +241,7 @@ def writer():
         "WP_USERNAME": get_cfg("WP_USERNAME"),
         "POST_STATUS": get_cfg("POST_STATUS", "draft"),
         "OPENAI_API_KEY": get_cfg("OPENAI_API_KEY"),
-        "GEMINI_API_KEY": get_cfg("GEMINI_API_KEY"),
+        "UNSPLASH_ACCESS_KEY": get_cfg("UNSPLASH_ACCESS_KEY"),
     }
     return render_template("writer.html", env=env, logs=upload_logs[-50:])
 
@@ -279,8 +279,8 @@ def api_writer_start():
                 wp_pw           = wp_pw,
                 wp_status       = data.get("wp_status", "draft"),
                 output_format   = data.get("output_format", "html"),
-                use_gemini      = data.get("use_gemini", False),
-                gemini_api_key  = data.get("gemini_api_key") or get_cfg("GEMINI_API_KEY"),
+                use_unsplash    = data.get("use_unsplash", False),
+                unsplash_api_key = data.get("unsplash_api_key") or get_cfg("UNSPLASH_ACCESS_KEY"),
                 max_images      = int(data.get("max_images", 3)),
                 h2_only         = data.get("h2_only", False),
                 platform        = data.get("platform", "general"),
@@ -303,8 +303,8 @@ def api_writer_save_keys():
     to_save = {}
     if data.get("OPENAI_API_KEY"):
         to_save["OPENAI_API_KEY"] = data["OPENAI_API_KEY"]
-    if data.get("GEMINI_API_KEY"):
-        to_save["GEMINI_API_KEY"] = data["GEMINI_API_KEY"]
+    if data.get("UNSPLASH_ACCESS_KEY"):
+        to_save["UNSPLASH_ACCESS_KEY"] = data["UNSPLASH_ACCESS_KEY"]
     if to_save:
         save_config(to_save)
     return jsonify({"status": "ok", "message": "API 키 저장 완료!"})

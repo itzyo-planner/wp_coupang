@@ -77,23 +77,21 @@ def wp_create_post(wp_base_url: str, auth_headers: dict, title: str, html_conten
     return r.json()
 
 
-# ── Gemini 이미지 생성 ──
+# ── Unsplash 이미지 검색 ──
 
-def gemini_generate_image_jpeg(api_key: str, prompt: str) -> bytes:
+def unsplash_get_image_jpeg(api_key: str, query: str) -> bytes:
     try:
-        import google.genai
-        from google.genai import types
-        client = google.genai.Client(api_key=api_key)
-        resp = client.models.generate_images(
-            model="imagen-4.0-generate-001",
-            prompt=prompt,
-            config=types.GenerateImagesConfig(number_of_images=1, output_mime_type="image/jpeg"),
-        )
-        img = resp.generated_images[0].image
-        raw_bytes = getattr(img, "image_bytes", None) or getattr(img, "imageBytes", None)
-        if not raw_bytes:
-            raise RuntimeError("이미지 바이트 없음")
-        image_obj = Image.open(io.BytesIO(raw_bytes))
+        url = "https://api.unsplash.com/photos/random"
+        params = {"query": query, "client_id": api_key, "orientation": "landscape"}
+        r = requests.get(url, params=params, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        img_url = data.get("urls", {}).get("regular") or data.get("urls", {}).get("full")
+        if not img_url:
+            raise RuntimeError("이미지 URL 없음")
+        img_resp = requests.get(img_url, timeout=60)
+        img_resp.raise_for_status()
+        image_obj = Image.open(io.BytesIO(img_resp.content))
         if image_obj.width > 800:
             ratio = 800 / image_obj.width
             image_obj = image_obj.resize((800, int(image_obj.height * ratio)), Image.Resampling.LANCZOS)
@@ -101,7 +99,7 @@ def gemini_generate_image_jpeg(api_key: str, prompt: str) -> bytes:
         image_obj.convert("RGB").save(out, format="JPEG", quality=65, optimize=True)
         return out.getvalue()
     except Exception as e:
-        raise RuntimeError(f"Gemini 이미지 생성 실패: {e}")
+        raise RuntimeError(f"Unsplash 이미지 가져오기 실패: {e}")
 
 
 def insert_images_under_headings(html_content: str, image_urls: List[str]) -> str:
@@ -346,8 +344,8 @@ def run_post_pipeline(
     wp_pw: str,
     wp_status: str = "draft",
     output_format: str = "html",
-    use_gemini: bool = False,
-    gemini_api_key: str = "",
+    use_unsplash: bool = False,
+    unsplash_api_key: str = "",
     max_images: int = 3,
     h2_only: bool = False,
     platform: str = "general",
@@ -387,36 +385,27 @@ def run_post_pipeline(
     )
     html_content = to_html(content_raw)
 
-    # 5) Gemini 이미지
+    # 5) Unsplash 이미지
     featured_media_id = None
-    if use_gemini and gemini_api_key:
+    if use_unsplash and unsplash_api_key:
         headings = extract_headings(html_content, h2_only=h2_only)[:max_images]
         image_urls = []
 
         # 썸네일 (대표 이미지)
-        _log("썸네일 이미지 생성 중...")
+        _log("썸네일 이미지 검색 중 (Unsplash)...")
         try:
-            concept = generate_thumbnail_concept(client, title)
-            thumb_prompt = (
-                f"Professional blog thumbnail: {concept}. "
-                "Clean, modern style, bright colors, no text overlay."
-            )
-            thumb_bytes = gemini_generate_image_jpeg(gemini_api_key, thumb_prompt)
+            thumb_bytes = unsplash_get_image_jpeg(unsplash_api_key, title)
             media = wp_upload_media(wp_url, auth, thumb_bytes, f"thumb_{re.sub(r'[^a-z0-9]', '_', title.lower())[:30]}.jpg", title)
             featured_media_id = media["id"]
             _log(f"썸네일 업로드 완료: {media['source_url']}")
         except Exception as e:
-            _log(f"썸네일 생성 실패 (계속 진행): {e}")
+            _log(f"썸네일 실패 (계속 진행): {e}")
 
         # 본문 이미지
         for i, heading in enumerate(headings):
-            _log(f"이미지 생성 중 ({i+1}/{len(headings)}): {heading}")
+            _log(f"이미지 검색 중 ({i+1}/{len(headings)}): {heading}")
             try:
-                img_prompt = (
-                    f"Blog illustration for section '{heading}'. "
-                    "Professional, clean, relevant visual, no text."
-                )
-                img_bytes = gemini_generate_image_jpeg(gemini_api_key, img_prompt)
+                img_bytes = unsplash_get_image_jpeg(unsplash_api_key, heading)
                 media = wp_upload_media(wp_url, auth, img_bytes, f"img_{i+1}.jpg", heading)
                 image_urls.append(media["source_url"])
                 _log(f"이미지 업로드: {media['source_url']}")
