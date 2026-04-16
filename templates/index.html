@@ -310,6 +310,7 @@
     <span class="dot-anim"></span> 실행 중
   </div>
   <a href="/writer" style="margin-left:12px; color:var(--primary); font-size:0.8rem; text-decoration:none; padding:6px 14px; border:1px solid var(--primary); border-radius:8px;">✍️ 일반글 작성</a>
+  <button onclick="copyAppLink(this)" style="background:none; cursor:pointer; color:var(--muted); font-size:0.8rem; padding:6px 14px; border:1px solid var(--border); border-radius:8px; transition:color 0.2s;">🔗 바로가기 복사</button>
   <a href="/logout" style="color:var(--muted); font-size:0.8rem; text-decoration:none; padding:6px 14px; border:1px solid var(--border); border-radius:8px;">로그아웃</a>
 </header>
 
@@ -704,6 +705,17 @@
     t.className = 'show ' + (type || 'info');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function() { t.className = ''; }, 4000);
+  }
+
+  function copyAppLink(btn) {
+    var url = window.location.origin;
+    navigator.clipboard.writeText(url).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = '✅ 복사됨!';
+      setTimeout(function() { btn.textContent = orig; }, 2000);
+    }).catch(function() {
+      showToast('클립보드 복사 실패: ' + url, 'error');
+    });
   }
 </script>
 </body>

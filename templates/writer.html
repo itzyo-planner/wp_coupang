@@ -151,6 +151,7 @@
       <span class="dot"></span> 작성 중
     </div>
     <a href="/" class="nav-link">← 대시보드</a>
+    <button onclick="copyAppLink(this)" class="nav-link" style="background:none; cursor:pointer;">🔗 바로가기 복사</button>
     <a href="/logout" class="nav-link" style="color:#ef4444; border-color:rgba(239,68,68,0.3);">로그아웃</a>
   </div>
 </header>
@@ -583,6 +584,17 @@
     t.className = 'show ' + (type || 'info');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function() { t.className = ''; }, 4000);
+  }
+
+  function copyAppLink(btn) {
+    var url = window.location.origin;
+    navigator.clipboard.writeText(url).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = '✅ 복사됨!';
+      setTimeout(function() { btn.textContent = orig; }, 2000);
+    }).catch(function() {
+      showToast('클립보드 복사 실패: ' + url, 'error');
+    });
   }
 </script>
 </body>
